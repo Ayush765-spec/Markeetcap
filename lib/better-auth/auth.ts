@@ -1,34 +1,41 @@
 import { betterAuth } from "better-auth";
-import { mongodbAdapter} from "better-auth/adapters/mongodb";
-import { connectToDatabase} from "@/database/mongoose";
-import { nextCookies} from "better-auth/next-js";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { db } from "@/database/drizzle";
+import { nextCookies } from "better-auth/next-js";
+import * as schema from "@/database/schema";
 
-let authInstance: ReturnType<typeof betterAuth> | null = null;
-
-export const getAuth = async () => {
-    if(authInstance) return authInstance;
-
-    const mongoose = await connectToDatabase();
-    const db = mongoose.connection.db;
-
-    if(!db) throw new Error('MongoDB connection not found');
-
-    authInstance = betterAuth({
-        database: mongodbAdapter(db as any),
-        secret: process.env.BETTER_AUTH_SECRET,
-        baseURL: process.env.BETTER_AUTH_URL,
-        emailAndPassword: {
-            enabled: true,
-            disableSignUp: false,
-            requireEmailVerification: false,
-            minPasswordLength: 8,
-            maxPasswordLength: 128,
-            autoSignIn: true,
-        },
-        plugins: [nextCookies()],
-    });
-
-    return authInstance;
-}
-
-export const auth = await getAuth();
+export const auth = betterAuth({
+    database: drizzleAdapter(db, {
+        provider: "pg",
+        schema: schema
+    }),
+    secret: process.env.BETTER_AUTH_SECRET,
+    baseURL: process.env.BETTER_AUTH_URL,
+    emailAndPassword: {
+        enabled: true,
+        autoSignIn: true,
+        minPasswordLength: 8,
+        maxPasswordLength: 128,
+    },
+    user: {
+        additionalFields: {
+            country: {
+                type: "string",
+                required: false,
+            },
+            investmentGoals: {
+                type: "string",
+                required: false,
+            },
+            riskTolerance: {
+                type: "string",
+                required: false,
+            },
+            preferredIndustry: {
+                type: "string",
+                required: false,
+            },
+        }
+    },
+    plugins: [nextCookies()],
+});

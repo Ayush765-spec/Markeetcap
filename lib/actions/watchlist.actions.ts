@@ -1,26 +1,22 @@
 'use server';
 
-import { connectToDatabase } from '@/database/mongoose';
-import { Watchlist } from '@/database/models/watchlist.model';
+import { db } from "@/database/drizzle";
+import { watchlist, user } from "@/database/schema";
+import { eq } from "drizzle-orm";
 
 export async function getWatchlistSymbolsByEmail(email: string): Promise<string[]> {
   if (!email) return [];
 
   try {
-    const mongoose = await connectToDatabase();
-    const db = mongoose.connection.db;
-    if (!db) throw new Error('MongoDB connection not found');
+    const u = await db.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1);
 
-    // Better Auth stores users in the "user" collection
-    const user = await db.collection('user').findOne<{ _id?: unknown; id?: string; email?: string }>({ email });
+    if (!u || u.length === 0) return [];
 
-    if (!user) return [];
-
-    const userId = (user.id as string) || String(user._id || '');
+    const userId = u[0].id;
     if (!userId) return [];
 
-    const items = await Watchlist.find({ userId }, { symbol: 1 }).lean();
-    return items.map((i) => String(i.symbol));
+    const items = await db.select({ symbol: watchlist.symbol }).from(watchlist).where(eq(watchlist.userId, userId));
+    return items.map((i) => i.symbol);
   } catch (err) {
     console.error('getWatchlistSymbolsByEmail error:', err);
     return [];
